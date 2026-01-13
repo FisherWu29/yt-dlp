@@ -20,9 +20,12 @@ logger = logging.getLogger('yt-dlp-wrapper')
 
 class VideoDownloader:
     """视频下载器类，封装yt-dlp的核心功能"""
-    
-    def __init__(self):
-        """初始化视频下载器"""
+
+    def __init__(self, enable_remote: bool = True):
+        """
+        初始化视频下载器
+        :param enable_remote: 是否启用远程组件（用于绕过YouTube的n参数限制）
+        """
         self.ydl_opts = {
             'quiet': True,
             'no_warnings': True,
@@ -33,20 +36,27 @@ class VideoDownloader:
             'verbose': False,
             'logger': logger,
             'merge_output_format': 'mp4',
+            'remote_components': ['ejs:github'] if enable_remote else [],
         }
-    
-    def _extract_video_info(self, url) -> Dict[str, Any]:
+
+    def _extract_video_info(self, url, enable_remote: Optional[bool] = None) -> Dict[str, Any]:
         """
         提取视频信息
         :param url: 视频URL（字符串或HttpUrl对象）
+        :param enable_remote: 是否启用远程组件，如果提供则覆盖初始化设置
         :return: 视频信息字典
         """
         # 确保url是字符串类型
         url_str = str(url) if hasattr(url, '__str__') else url
-        with YoutubeDL(self.ydl_opts) as ydl:
+
+        opts = self.ydl_opts.copy()
+        if enable_remote is not None:
+            opts['remote_components'] = ['ejs:github'] if enable_remote else []
+
+        with YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url_str, download=False)
             return info
-    
+
     def _format_info_to_response(self, format_info: Dict[str, Any]) -> FormatInfo:
         """
         将yt-dlp格式信息转换为响应模型
@@ -57,7 +67,7 @@ class VideoDownloader:
         width = format_info.get('width', 0)
         height = format_info.get('height', 0)
         resolution = f"{width}x{height}" if width and height else "N/A"
-        
+
         return FormatInfo(
             format_id=str(format_info.get('format_id', 'N/A')),
             format_note=format_info.get('format_note', 'N/A'),
@@ -68,45 +78,46 @@ class VideoDownloader:
             filesize_approx=format_info.get('filesize_approx'),
             url=format_info.get('url')
         )
-    
-    def get_video_formats(self, url, max_quality: Optional[int] = None) -> VideoInfoResponse:
+
+    def get_video_formats(self, url, max_quality: Optional[int] = None, enable_remote: Optional[bool] = None) -> VideoInfoResponse:
         """
         获取视频的可用格式列表
         :param url: 视频URL（字符串或HttpUrl对象）
         :param max_quality: 最大分辨率高度，如1080
+        :param enable_remote: 是否启用远程组件
         :return: VideoInfoResponse响应模型
         """
         # 提取视频信息
-        info = self._extract_video_info(url)
-        
+        info = self._extract_video_info(url, enable_remote=enable_remote)
+
         # 处理格式列表
         formats = []
         best_format = None
         best_height = 0
-        
+
         for fmt in info.get('formats', []):
             # 跳过纯音频格式（vcodec为none）
             if fmt.get('vcodec') == 'none':
                 continue
-            
+
             # 过滤分辨率
             height = fmt.get('height', 0)
             if max_quality and height > max_quality:
                 continue
-            
+
             # 转换为响应格式
             format_response = self._format_info_to_response(fmt)
             formats.append(format_response)
-            
+
             # 找到最佳格式
             if height > best_height:
                 best_height = height
                 best_format = format_response
-        
+
         # 如果没有找到最佳格式，尝试使用第一个格式
         if not best_format and formats:
             best_format = formats[0]
-        
+
         # 构建响应
         return VideoInfoResponse(
             title=info.get('title', 'N/A'),
@@ -118,24 +129,25 @@ class VideoDownloader:
             duration=info.get('duration'),
             uploader=info.get('uploader')
         )
-    
-    def get_download_links(self, url, format_id: Optional[str] = None, max_quality: Optional[int] = None) -> Dict[str, Any]:
+
+    def get_download_links(self, url, format_id: Optional[str] = None, max_quality: Optional[int] = None, enable_remote: Optional[bool] = None) -> Dict[str, Any]:
         """
         获取视频的真实下载链接
         :param url: 视频URL（字符串或HttpUrl对象）
         :param format_id: 特定格式ID，可选
         :param max_quality: 最大分辨率高度，可选
+        :param enable_remote: 是否启用远程组件
         :return: 包含视频信息和下载链接的字典
         """
         # 提取视频信息
-        info = self._extract_video_info(url)
-        
+        info = self._extract_video_info(url, enable_remote=enable_remote)
+
         # 获取可用格式
         available_formats = info.get('formats', [])
-        
+
         # 选择要下载的格式
         selected_formats = []
-        
+
         if format_id:
             # 按格式ID选择
             for fmt in available_formats:
@@ -147,62 +159,63 @@ class VideoDownloader:
             # 1. 查找最佳视频格式
             best_video = None
             best_height = 0
-            
+
             for fmt in available_formats:
                 # 跳过音频格式
                 if fmt.get('vcodec') == 'none':
                     continue
-                
-                height = fmt.get('height', 0)
+
+                height = fmt.get('height') or 0
                 # 过滤分辨率
                 if max_quality and height > max_quality:
                     continue
-                
+
                 if height > best_height:
                     best_height = height
                     best_video = fmt
-            
+
             # 2. 查找最佳音频格式
             best_audio = None
             best_abr = 0
-            
+
             for fmt in available_formats:
                 # 跳过视频格式
                 if fmt.get('acodec') != 'none':
-                    abr = fmt.get('abr', 0)
+                    abr = fmt.get('abr') or 0
                     if abr > best_abr:
                         best_abr = abr
                         best_audio = fmt
-            
+
             # 3. 添加选定的格式
             if best_video:
                 selected_formats.append(best_video)
             if best_audio:
                 selected_formats.append(best_audio)
-        
+
         # 如果没有选择到格式，使用默认最佳格式
         if not selected_formats:
             # 查找最佳综合格式
             best_combined = None
             best_score = 0
-            
+
             for fmt in available_formats:
                 # 综合格式既有视频又有音频
                 if fmt.get('vcodec') != 'none' and fmt.get('acodec') != 'none':
-                    height = fmt.get('height', 0)
+                    height = fmt.get('height') or 0
                     # 过滤分辨率
                     if max_quality and height > max_quality:
                         continue
-                    
+
                     # 简单评分：高度 + 码率
-                    score = height + (fmt.get('tbr', 0) / 1000)
+                    tbr = fmt.get('tbr') or 0
+                    score = height + (tbr / 1000)
                     if score > best_score:
                         best_score = score
                         best_combined = fmt
-            
+
             if best_combined:
                 selected_formats.append(best_combined)
-        
+
         # 构建下载链接列表
         download_links = []
         for fmt in selected_formats:
@@ -214,15 +227,15 @@ class VideoDownloader:
                     'ext': fmt.get('ext', 'N/A'),
                     'url': format_url
                 })
-        
+
         # 构建视频信息响应
-        video_info = self.get_video_formats(url, max_quality)
-        
+        video_info = self.get_video_formats(url, max_quality, enable_remote=enable_remote)
+
         return {
             "video_info": video_info,
             "download_links": download_links
         }
-    
+
     def get_best_download_link(self, url, max_quality: Optional[int] = None) -> Dict[str, Any]:
         """
         获取最佳质量的下载链接
@@ -232,12 +245,12 @@ class VideoDownloader:
         """
         # 获取下载链接
         result = self.get_download_links(url, max_quality=max_quality)
-        
+
         # 找到最佳下载链接
         best_link = None
         if result['download_links']:
             best_link = result['download_links'][0]  # 第一个通常是最佳视频格式
-        
+
         return {
             "video_info": result['video_info'],
             "best_download_link": best_link
