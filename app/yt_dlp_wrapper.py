@@ -205,7 +205,7 @@ class VideoDownloader:
                     # 过滤分辨率
                     if max_quality and height > max_quality:
                         continue
-
+                    
                     # 简单评分：高度 + 码率
                     tbr = fmt.get('tbr') or 0
                     score = height + (tbr / 1000)
