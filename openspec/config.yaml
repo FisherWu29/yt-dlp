@@ -1,0 +1,74 @@
+schema: spec-driven
+
+# Project context
+# 项目上下文信息，用于指导 AI 生成符合项目规范的 artifact
+context: |
+  ## 项目概述
+  这是一个基于 yt-dlp 的视频下载 API 服务，为内部 App 提供视频解析和下载能力。
+
+  ## 技术栈
+  - **后端框架**: FastAPI (Python 3.11+)
+  - **ASGI 服务器**: Uvicorn
+  - **数据验证**: Pydantic v2
+  - **核心库**: yt-dlp (视频解析和下载)
+  - **容器化**: Docker
+  - **版本控制**: Git
+
+  ## 项目结构
+  ```
+  app/
+  ├── app.py              # FastAPI 主应用，定义所有 API 接口
+  ├── models.py           # Pydantic 数据模型定义
+  ├── yt_dlp_wrapper.py   # yt-dlp 核心封装类
+  ├── requirements.txt    # Python 依赖
+  └── Dockerfile         # Docker 镜像构建配置
+  ```
+
+  ## API 接口
+  1. **GET /health** - 健康检查
+  2. **GET /formats** - 获取视频可用格式列表
+  3. **GET /download-link** - 获取视频下载链接 (GET 方式)
+  4. **POST /download-link** - 获取视频下载链接 (POST 方式)
+
+  ## 代码规范
+  - 使用类型注解 (Type Hints)
+  - API 响应统一使用 Pydantic 模型
+  - 错误处理使用 HTTPException，返回清晰的错误信息
+  - 日志使用 Python logging 模块
+  - 函数和变量使用 snake_case 命名
+  - 类名使用 PascalCase 命名
+
+  ## 特殊处理
+  - YouTube 链接自动检测并启用远程组件 (enable_remote=True)
+  - 视频格式自动过滤（排除纯音频格式）
+  - 支持最大分辨率限制 (max_quality 参数)
+
+  ## 支持平台
+  YouTube, Bilibili, Vimeo, Twitter, Instagram, TikTok 等 60+ 视频平台
+
+# Per-artifact rules
+# 针对 artifact 类型的特定规则
+rules:
+  proposal:
+    - 提案必须包含：背景、目标、变更概述、影响范围
+    - 对于 API 变更，需说明向后兼容性
+    - 对于 yt-dlp 版本升级，需评估影响的功能
+    - 保持提案简洁，聚焦核心变更
+
+  spec:
+    - API 规范必须包含：端点路径、请求方法、参数、响应格式、错误码
+    - 数据模型变更需同步更新 models.py
+    - 新增功能需考虑与现有接口的一致性
+    - 添加必要的错误场景说明
+
+  tasks:
+    - 按优先级排列任务
+    - 每个 Task 应可独立验证
+    - 代码任务完成后需添加相应测试
+    - Docker 变更需测试镜像构建和运行
+
+  test-plan:
+    - 必须覆盖：正常场景、边界条件、错误处理
+    - 测试多平台视频链接（YouTube、Bilibili 等）
+    - 测试不同分辨率的格式选择
+    - 测试无效 URL 和网络错误等异常场景

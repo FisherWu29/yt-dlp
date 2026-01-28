@@ -37,8 +37,47 @@ class VideoDownloader:
             'logger': logger,
             'merge_output_format': 'mp4',
             'remote_components': ['ejs:github'] if enable_remote else [],
+            'timeout': 10,  # 设置超时时间为10秒
+            'socket_timeout': 5,  # 设置socket超时时间为5秒
+        }
+        
+        # 支持的视频网站域名列表
+        self.supported_domains = {
+            'youtube.com', 'youtu.be', 'youtube-nocookie.com',
+            'bilibili.com', 'b23.tv',
+            'vimeo.com',
+            'dailymotion.com',
+            'twitch.tv',
+            'twitter.com', 'x.com',
+            'instagram.com',
+            'facebook.com',
+            'tiktok.com',
+            'reddit.com',
+            'netflix.com',
+            'disneyplus.com',
+            'hulu.com',
+            'primevideo.com',
         }
 
+    def _is_supported_url(self, url_str: str) -> bool:
+        """
+        快速判断URL是否支持
+        :param url_str: 视频URL字符串
+        :return: 是否支持该URL
+        """
+        from urllib.parse import urlparse
+        
+        # 解析URL
+        parsed_url = urlparse(url_str)
+        hostname = parsed_url.hostname.lower() if parsed_url.hostname else ''
+        
+        # 检查是否在支持的域名列表中
+        for domain in self.supported_domains:
+            if hostname.endswith(domain):
+                return True
+        
+        return False
+    
     def _extract_video_info(self, url, enable_remote: Optional[bool] = None) -> Dict[str, Any]:
         """
         提取视频信息
@@ -48,6 +87,11 @@ class VideoDownloader:
         """
         # 确保url是字符串类型
         url_str = str(url) if hasattr(url, '__str__') else url
+        
+        # 快速预验证URL是否支持
+        if not self._is_supported_url(url_str):
+            logger.error(f"不支持的URL: {url_str}")
+            raise ValueError(f"不支持的URL: {url_str}")
 
         opts = self.ydl_opts.copy()
         if enable_remote is not None:

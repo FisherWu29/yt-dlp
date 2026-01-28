@@ -28,7 +28,7 @@ class VideoUrlRequest(BaseModel):
     url: HttpUrl
     format_id: Optional[str] = None
     max_quality: Optional[int] = None
-    enable_remote: Optional[bool] = True
+    enable_remote: Optional[bool] = None
 
 class DownloadLinkResponse(BaseModel):
     """下载链接响应"""

@@ -51,12 +51,19 @@ def health_check():
 def get_video_formats(
     url: HttpUrl = Query(..., description="视频URL"),
     max_quality: Optional[int] = Query(None, description="最大分辨率高度，如1080"),
-    enable_remote: bool = Query(True, description="是否启用远程组件（绕过YouTube限制）")
+    enable_remote: Optional[bool] = Query(None, description="是否启用远程组件（绕过YouTube限制），默认仅在YouTube请求时启用")
 ):
     """获取视频的可用格式列表"""
     try:
-        logger.info(f"获取视频格式: {url}, 启用远程组件: {enable_remote}")
-        video_info = downloader.get_video_formats(url, max_quality, enable_remote=enable_remote)
+        # 判断是否为YouTube链接
+        url_str = str(url)
+        is_youtube = "youtube.com" in url_str or "youtu.be" in url_str
+
+        # 仅当enable_remote为None时，根据是否为YouTube链接自动设置
+        final_enable_remote = is_youtube if enable_remote is None else enable_remote
+
+        logger.info(f"获取视频格式: {url}, 是YouTube链接: {is_youtube}, 启用远程组件: {final_enable_remote}")
+        video_info = downloader.get_video_formats(url, max_quality, enable_remote=final_enable_remote)
         return video_info
     except Exception as e:
         logger.error(f"获取视频格式失败: {e}", exc_info=True)
@@ -66,12 +73,19 @@ def get_video_formats(
 def get_download_link(request: VideoUrlRequest):
     """获取视频的真实下载链接"""
     try:
-        logger.info(f"获取下载链接: {request.url}, 格式: {request.format_id}, 启用远程组件: {request.enable_remote}")
+        # 判断是否为YouTube链接
+        url_str = str(request.url)
+        is_youtube = "youtube.com" in url_str or "youtu.be" in url_str
+
+        # 仅当enable_remote为None时，根据是否为YouTube链接自动设置
+        final_enable_remote = is_youtube if request.enable_remote is None else request.enable_remote
+
+        logger.info(f"获取下载链接: {request.url}, 格式: {request.format_id}, 是YouTube链接: {is_youtube}, 启用远程组件: {final_enable_remote}")
         download_links = downloader.get_download_links(
             request.url,
             format_id=request.format_id,
             max_quality=request.max_quality,
-            enable_remote=request.enable_remote
+            enable_remote=final_enable_remote
         )
         return {
             "status": "success",
@@ -88,16 +102,23 @@ def get_download_link_get(
     url: HttpUrl = Query(..., description="视频URL"),
     format_id: Optional[str] = Query(None, description="特定格式ID") ,
     max_quality: Optional[int] = Query(None, description="最大分辨率高度，如1080"),
-    enable_remote: bool = Query(True, description="是否启用远程组件（绕过YouTube限制）")
+    enable_remote: Optional[bool] = Query(None, description="是否启用远程组件（绕过YouTube限制），默认仅在YouTube请求时启用")
 ):
     """通过GET请求获取视频的真实下载链接"""
     try:
-        logger.info(f"GET获取下载链接: {url}, 格式: {format_id}, 启用远程组件: {enable_remote}")
+        # 判断是否为YouTube链接
+        url_str = str(url)
+        is_youtube = "youtube.com" in url_str or "youtu.be" in url_str
+
+        # 仅当enable_remote为None时，根据是否为YouTube链接自动设置
+        final_enable_remote = is_youtube if enable_remote is None else enable_remote
+
+        logger.info(f"GET获取下载链接: {url}, 格式: {format_id}, 是YouTube链接: {is_youtube}, 启用远程组件: {final_enable_remote}")
         download_links = downloader.get_download_links(
             url,
             format_id=format_id,
             max_quality=max_quality,
-            enable_remote=enable_remote
+            enable_remote=final_enable_remote
         )
         return {
             "status": "success",
