@@ -8,11 +8,12 @@
 import logging
 import sys
 import os
+import time
 
 # 添加项目根目录到Python路径，以便正确导入yt_dlp
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import HttpUrl
 from typing import Dict, List, Optional
 from yt_dlp_wrapper import VideoDownloader
@@ -33,6 +34,32 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """
+    请求日志中间件
+    记录请求方法、路径、状态码以及处理时间
+    """
+    start_time = time.time()
+    
+    # 获取客户端IP
+    client_host = request.client.host if request.client else "unknown"
+    
+    # 继续处理请求
+    response = await call_next(request)
+    
+    # 计算处理时间
+    process_time = (time.time() - start_time) * 1000
+    formatted_process_time = "{0:.2f}ms".format(process_time)
+    
+    logger.info(
+        f"Method: {request.method} Path: {request.url.path} "
+        f"Status: {response.status_code} IP: {client_host} "
+        f"Duration: {formatted_process_time}"
+    )
+    
+    return response
 
 # 创建视频下载器实例
 downloader = VideoDownloader()
