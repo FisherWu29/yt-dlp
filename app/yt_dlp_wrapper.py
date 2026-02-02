@@ -104,11 +104,26 @@ class VideoDownloader:
     def get_raw_info(self, url, enable_remote: Optional[bool] = None) -> Dict[str, Any]:
         """
         获取视频的原始信息（相当于 yt-dlp --dump-json）
+        并过滤 formats 数组，只保留视频和音频对象
         :param url: 视频URL（字符串或HttpUrl对象）
         :param enable_remote: 是否启用远程组件
         :return: 原始视频信息字典
         """
-        return self._extract_video_info(url, enable_remote=enable_remote)
+        info = self._extract_video_info(url, enable_remote=enable_remote)
+
+        # 过滤 formats 数组，只保留视频或音频
+        # 在 yt-dlp 中，如果是音视频对象，通常 vcodec 或 acodec 不为 'none'
+        if 'formats' in info:
+            filtered_formats = []
+            for fmt in info['formats']:
+                vcodec = fmt.get('vcodec')
+                acodec = fmt.get('acodec')
+                # 只要 vcodec 或 acodec 任意一个不是 'none'，说明是视频、音频或两者都有
+                if (vcodec and vcodec != 'none') or (acodec and acodec != 'none'):
+                    filtered_formats.append(fmt)
+            info['formats'] = filtered_formats
+
+        return info
 
     def _format_info_to_response(self, format_info: Dict[str, Any]) -> FormatInfo:
         """
@@ -185,20 +200,20 @@ class VideoDownloader:
 
     def get_download_links(self, url, format_id: Optional[str] = None, max_quality: Optional[int] = None, enable_remote: Optional[bool] = None) -> Dict[str, Any]:
         """
-        获取视频的真实下载链接
+        获取视频的最佳下载链接
         :param url: 视频URL（字符串或HttpUrl对象）
         :param format_id: 特定格式ID，可选
         :param max_quality: 最大分辨率高度，可选
         :param enable_remote: 是否启用远程组件
-        :return: 包含视频信息和下载链接的字典
+        :return: 包含精简视频信息和选定格式（完整字段）的字典
         """
-        # 提取视频信息
+        # 提取完整视频信息
         info = self._extract_video_info(url, enable_remote=enable_remote)
 
-        # 获取可用格式
+        # 获取可用格式（这里我们用原始的，不进行初步过滤，以便筛选）
         available_formats = info.get('formats', [])
 
-        # 选择要下载的格式
+        # 选择要返回的格式对象
         selected_formats = []
 
         if format_id:
@@ -208,85 +223,58 @@ class VideoDownloader:
                     selected_formats.append(fmt)
                     break
         else:
-            # 选择最佳质量的视频和音频
+            # 自动筛选逻辑
             # 1. 查找最佳视频格式
             best_video = None
             best_height = 0
-
             for fmt in available_formats:
-                # 跳过音频格式
-                if fmt.get('vcodec') == 'none':
-                    continue
-
-                height = fmt.get('height') or 0
-                # 过滤分辨率
-                if max_quality and height > max_quality:
-                    continue
-
-                if height > best_height:
-                    best_height = height
-                    best_video = fmt
+                if fmt.get('vcodec') != 'none':
+                    height = fmt.get('height') or 0
+                    if max_quality and height > max_quality:
+                        continue
+                    if height >= best_height:
+                        best_height = height
+                        best_video = fmt
 
             # 2. 查找最佳音频格式
             best_audio = None
             best_abr = 0
-
             for fmt in available_formats:
-                # 跳过视频格式
-                if fmt.get('acodec') != 'none':
+                if fmt.get('acodec') != 'none' and fmt.get('vcodec') == 'none':
                     abr = fmt.get('abr') or 0
-                    if abr > best_abr:
+                    if abr >= best_abr:
                         best_abr = abr
                         best_audio = fmt
 
-            # 3. 添加选定的格式
-            if best_video:
+            # 3. 如果没找到分离的，找最佳综合格式
+            if not best_video:
+                best_combined = None
+                best_combined_height = 0
+                for fmt in available_formats:
+                    if fmt.get('vcodec') != 'none' and fmt.get('acodec') != 'none':
+                        height = fmt.get('height') or 0
+                        if max_quality and height > max_quality:
+                            continue
+                        if height >= best_combined_height:
+                            best_combined_height = height
+                            best_combined = fmt
+                if best_combined:
+                    selected_formats.append(best_combined)
+            else:
                 selected_formats.append(best_video)
-            if best_audio:
-                selected_formats.append(best_audio)
+                if best_audio:
+                    selected_formats.append(best_audio)
 
-        # 如果没有选择到格式，使用默认最佳格式
-        if not selected_formats:
-            # 查找最佳综合格式
-            best_combined = None
-            best_score = 0
-
-            for fmt in available_formats:
-                # 综合格式既有视频又有音频
-                if fmt.get('vcodec') != 'none' and fmt.get('acodec') != 'none':
-                    height = fmt.get('height') or 0
-                    # 过滤分辨率
-                    if max_quality and height > max_quality:
-                        continue
-
-                    # 简单评分：高度 + 码率
-                    tbr = fmt.get('tbr') or 0
-                    score = height + (tbr / 1000)
-                    if score > best_score:
-                        best_score = score
-                        best_combined = fmt
-
-            if best_combined:
-                selected_formats.append(best_combined)
-
-        # 构建下载链接列表
-        download_links = []
-        for fmt in selected_formats:
-            format_url = fmt.get('url')
-            if format_url:
-                download_links.append({
-                    'format_id': str(fmt.get('format_id')),
-                    'format_note': fmt.get('format_note', 'N/A'),
-                    'ext': fmt.get('ext', 'N/A'),
-                    'url': format_url
-                })
-
-        # 构建视频信息响应
-        video_info = self.get_video_formats(url, max_quality, enable_remote=enable_remote)
-
+        # 构建最终返回对象
+        # 只保留基本的视频元数据，避免返回几百行
         return {
-            "video_info": video_info,
-            "download_links": download_links
+            "title": info.get('title'),
+            "id": info.get('id'),
+            "duration": info.get('duration'),
+            "uploader": info.get('uploader'),
+            "thumbnail": info.get('thumbnail'),
+            "webpage_url": info.get('webpage_url'),
+            "selected_formats": selected_formats  # 这里包含选定格式的全部原始字段
         }
 
     def get_best_download_link(self, url, max_quality: Optional[int] = None) -> Dict[str, Any]:
