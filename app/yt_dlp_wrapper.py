@@ -40,7 +40,7 @@ class VideoDownloader:
             'timeout': 10,  # 设置超时时间为10秒
             'socket_timeout': 5,  # 设置socket超时时间为5秒
         }
-        
+
         # 支持的视频网站域名列表
         self.supported_domains = {
             'youtube.com', 'youtu.be', 'youtube-nocookie.com',
@@ -66,18 +66,18 @@ class VideoDownloader:
         :return: 是否支持该URL
         """
         from urllib.parse import urlparse
-        
+
         # 解析URL
         parsed_url = urlparse(url_str)
         hostname = parsed_url.hostname.lower() if parsed_url.hostname else ''
-        
+
         # 检查是否在支持的域名列表中
         for domain in self.supported_domains:
             if hostname.endswith(domain):
                 return True
-        
+
         return False
-    
+
     def _extract_video_info(self, url, enable_remote: Optional[bool] = None) -> Dict[str, Any]:
         """
         提取视频信息
@@ -87,7 +87,7 @@ class VideoDownloader:
         """
         # 确保url是字符串类型
         url_str = str(url) if hasattr(url, '__str__') else url
-        
+
         # 快速预验证URL是否支持
         if not self._is_supported_url(url_str):
             logger.error(f"不支持的URL: {url_str}")
@@ -100,6 +100,15 @@ class VideoDownloader:
         with YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url_str, download=False)
             return info
+
+    def get_raw_info(self, url, enable_remote: Optional[bool] = None) -> Dict[str, Any]:
+        """
+        获取视频的原始信息（相当于 yt-dlp --dump-json）
+        :param url: 视频URL（字符串或HttpUrl对象）
+        :param enable_remote: 是否启用远程组件
+        :return: 原始视频信息字典
+        """
+        return self._extract_video_info(url, enable_remote=enable_remote)
 
     def _format_info_to_response(self, format_info: Dict[str, Any]) -> FormatInfo:
         """
@@ -249,7 +258,7 @@ class VideoDownloader:
                     # 过滤分辨率
                     if max_quality and height > max_quality:
                         continue
-                    
+
                     # 简单评分：高度 + 码率
                     tbr = fmt.get('tbr') or 0
                     score = height + (tbr / 1000)

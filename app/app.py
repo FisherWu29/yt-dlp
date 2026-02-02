@@ -74,13 +74,12 @@ def health_check():
         "timestamp": logging.Formatter().formatTime(logging.LogRecord(None, None, None, None, None, None, None, None, None))
     }
 
-@app.get("/formats", summary="获取视频可用格式", tags=["视频"], response_model=VideoInfoResponse)
+@app.get("/formats", summary="获取视频可用格式", tags=["视频"])
 def get_video_formats(
     url: HttpUrl = Query(..., description="视频URL"),
-    max_quality: Optional[int] = Query(None, description="最大分辨率高度，如1080"),
     enable_remote: Optional[bool] = Query(None, description="是否启用远程组件（绕过YouTube限制），默认仅在YouTube请求时启用")
 ):
-    """获取视频的可用格式列表"""
+    """获取视频的可用格式列表（返回原始JSON数据）"""
     try:
         # 判断是否为YouTube链接
         url_str = str(url)
@@ -89,16 +88,16 @@ def get_video_formats(
         # 仅当enable_remote为None时，根据是否为YouTube链接自动设置
         final_enable_remote = is_youtube if enable_remote is None else enable_remote
 
-        logger.info(f"获取视频格式: {url}, 是YouTube链接: {is_youtube}, 启用远程组件: {final_enable_remote}")
-        video_info = downloader.get_video_formats(url, max_quality, enable_remote=final_enable_remote)
+        logger.info(f"获取原始视频信息: {url}, 是YouTube链接: {is_youtube}, 启用远程组件: {final_enable_remote}")
+        video_info = downloader.get_raw_info(url, enable_remote=final_enable_remote)
         return video_info
     except Exception as e:
         logger.error(f"获取视频格式失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取视频格式失败: {str(e)}")
 
-@app.post("/download-link", summary="获取视频下载链接", tags=["视频"], response_model=DownloadLinkResponse)
+@app.post("/download-link", summary="获取视频下载链接", tags=["视频"])
 def get_download_link(request: VideoUrlRequest):
-    """获取视频的真实下载链接"""
+    """获取视频的真实下载链接（返回原始JSON数据）"""
     try:
         # 判断是否为YouTube链接
         url_str = str(request.url)
@@ -107,31 +106,22 @@ def get_download_link(request: VideoUrlRequest):
         # 仅当enable_remote为None时，根据是否为YouTube链接自动设置
         final_enable_remote = is_youtube if request.enable_remote is None else request.enable_remote
 
-        logger.info(f"获取下载链接: {request.url}, 格式: {request.format_id}, 是YouTube链接: {is_youtube}, 启用远程组件: {final_enable_remote}")
-        download_links = downloader.get_download_links(
+        logger.info(f"获取下载链接(原始): {request.url}, 是YouTube链接: {is_youtube}, 启用远程组件: {final_enable_remote}")
+        video_info = downloader.get_raw_info(
             request.url,
-            format_id=request.format_id,
-            max_quality=request.max_quality,
             enable_remote=final_enable_remote
         )
-        return {
-            "status": "success",
-            "message": "获取下载链接成功",
-            "video_info": download_links["video_info"],
-            "download_links": download_links["download_links"]
-        }
+        return video_info
     except Exception as e:
         logger.error(f"获取下载链接失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取下载链接失败: {str(e)}")
 
-@app.get("/download-link", summary="获取视频下载链接(GET)", tags=["视频"], response_model=DownloadLinkResponse)
+@app.get("/download-link", summary="获取视频下载链接(GET)", tags=["视频"])
 def get_download_link_get(
     url: HttpUrl = Query(..., description="视频URL"),
-    format_id: Optional[str] = Query(None, description="特定格式ID") ,
-    max_quality: Optional[int] = Query(None, description="最大分辨率高度，如1080"),
     enable_remote: Optional[bool] = Query(None, description="是否启用远程组件（绕过YouTube限制），默认仅在YouTube请求时启用")
 ):
-    """通过GET请求获取视频的真实下载链接"""
+    """通过GET请求获取视频的真实下载链接（返回原始JSON数据）"""
     try:
         # 判断是否为YouTube链接
         url_str = str(url)
@@ -140,19 +130,12 @@ def get_download_link_get(
         # 仅当enable_remote为None时，根据是否为YouTube链接自动设置
         final_enable_remote = is_youtube if enable_remote is None else enable_remote
 
-        logger.info(f"GET获取下载链接: {url}, 格式: {format_id}, 是YouTube链接: {is_youtube}, 启用远程组件: {final_enable_remote}")
-        download_links = downloader.get_download_links(
+        logger.info(f"GET获取下载链接(原始): {url}, 是YouTube链接: {is_youtube}, 启用远程组件: {final_enable_remote}")
+        video_info = downloader.get_raw_info(
             url,
-            format_id=format_id,
-            max_quality=max_quality,
             enable_remote=final_enable_remote
         )
-        return {
-            "status": "success",
-            "message": "获取下载链接成功",
-            "video_info": download_links["video_info"],
-            "download_links": download_links["download_links"]
-        }
+        return video_info
     except Exception as e:
         logger.error(f"GET获取下载链接失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取下载链接失败: {str(e)}")
