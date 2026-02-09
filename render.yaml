@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: yt-dlp-api
+    runtime: python
+    buildCommand: ./render_build.sh
+    startCommand: uvicorn app.app:app --host 0.0.0.0 --port $PORT
+    plan: free
+    region: singapore
+    envVars:
+      - key: PYTHONPATH
+        value: .

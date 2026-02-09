@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic
+python-multipart
+requests
+urllib3
+websockets
+yt-dlp-ejs
+brotli
+mutagen
+pycryptodomex
