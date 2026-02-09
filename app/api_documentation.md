@@ -109,6 +109,8 @@
   | audio_ext | string | 音频扩展名 |
   | resolution | string | 分辨率字符串 |
   | aspect_ratio | float | 宽高比 |
+  | filesize | long | 文件大小（字节） |
+  | filesize_approx | long | 预估文件大小（字节） |
   | http_headers | object | 下载所需的HTTP头信息 |
   | url | string | 真实下载链接 |
 
@@ -135,6 +137,7 @@
       "ext": "webm",
       "vcodec": "vp9",
       "acodec": "none",
+      "filesize": 123456789,
       "url": "https://...",
       "http_headers": { "User-Agent": "..." }
     },

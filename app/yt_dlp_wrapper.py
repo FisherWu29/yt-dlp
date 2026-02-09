@@ -120,6 +120,8 @@ class VideoDownloader:
             "audio_ext": fmt.get('audio_ext', 'none'),
             "resolution": fmt.get('resolution', ''),
             "aspect_ratio": fmt.get('aspect_ratio'),
+            "filesize": fmt.get('filesize'),
+            "filesize_approx": fmt.get('filesize_approx'),
             "http_headers": fmt.get('http_headers', {}),
             "format": fmt.get('format', ''),
             "url": fmt.get('url', '')
