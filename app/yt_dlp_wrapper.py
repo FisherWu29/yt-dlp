@@ -183,13 +183,41 @@ class VideoDownloader:
                 audio_formats.sort(key=lambda x: (1 if x.get('ext') == 'm4a' else 0, x.get('abr') or 0), reverse=True)
                 best_audio = audio_formats[0]
 
-            # 3. 找出最佳视频
+            # 3. 找出最佳视频并按分辨率过滤
             best_video = None
             if video_formats:
+                # 3.1 排序：先按高度排序，再按码率排序
                 video_formats.sort(key=lambda x: (x.get('height') or 0, x.get('tbr') or 0), reverse=True)
                 best_video = video_formats[0]
 
-            # 4. 重新构建 formats 列表：所有视频 + 1个最佳音频
+                # 3.2 实施分辨率去重逻辑：
+                # 如果同一分辨率存在 MP4 + H.264 (avc1)，则只保留该格式；否则保留该分辨率下的所有格式。
+                res_dict = {}
+                for fmt in video_formats:
+                    res = fmt.get('height')
+                    if res not in res_dict:
+                        res_dict[res] = []
+                    res_dict[res].append(fmt)
+
+                filtered_video_formats = []
+                for res, fmts in res_dict.items():
+                    # 检查是否存在 MP4 + H.264 (avc1)
+                    # avc1 编码通常在 vcodec 字段中包含 'avc1' 字样
+                    mp4_h264 = [f for f in fmts if f.get('ext') == 'mp4' and 'avc1' in (f.get('vcodec') or '').lower()]
+
+                    if mp4_h264:
+                        # 如果存在 MP4 + H.264，只保留这一个（如果有多个同分辨率的 MP4+H264，保留码率最高的一个）
+                        mp4_h264.sort(key=lambda x: x.get('tbr') or 0, reverse=True)
+                        filtered_video_formats.append(mp4_h264[0])
+                    else:
+                        # 如果不存在，保留该分辨率下的所有格式
+                        filtered_video_formats.extend(fmts)
+
+                # 重新按高度排序返回的视频列表
+                filtered_video_formats.sort(key=lambda x: (x.get('height') or 0, x.get('tbr') or 0), reverse=True)
+                video_formats = filtered_video_formats
+
+            # 4. 重新构建 formats 列表：过滤后的视频 + 1个最佳音频
             final_formats = video_formats
             if best_audio:
                 final_formats.append(best_audio)
