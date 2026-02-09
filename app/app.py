@@ -10,18 +10,19 @@ import sys
 import os
 import time
 
-# 添加项目根目录到Python路径，以便正确导入yt_dlp
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# 添加当前目录和项目根目录到Python路径
+current_dir = os.path.abspath(os.path.dirname(__file__))
+parent_dir = os.path.abspath(os.path.join(current_dir, '..'))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import HttpUrl
 from typing import Dict, List, Optional
-try:
-    from yt_dlp_wrapper import VideoDownloader
-    from models import VideoUrlRequest, FormatInfo, VideoInfoResponse, DownloadLinkResponse
-except ImportError:
-    from .yt_dlp_wrapper import VideoDownloader
-    from .models import VideoUrlRequest, FormatInfo, VideoInfoResponse, DownloadLinkResponse
+from yt_dlp_wrapper import VideoDownloader
+from models import VideoUrlRequest, FormatInfo, VideoInfoResponse, DownloadLinkResponse
 
 # 配置日志
 logging.basicConfig(
