@@ -1,0 +1,62 @@
+{
+    "id": "",
+    "title": "",
+    "thumbnail": "https://i.ytimg.com/vi/Mb6H7trzMfI/maxresdefault.jpg",
+    "channel_id": "UCBJycsmduvYEL83R_U4JriQ",
+    "channel_url": "https://www.youtube.com/channel/UCBJycsmduvYEL83R_U4JriQ",
+    "duration": 1044,
+    "webpage_url": "https://www.youtube.com/watch?v=Mb6H7trzMfI",
+    "media_type": "video",
+    "needs_merge": true,
+    "original_url": "https://www.youtube.com/watch?v=Mb6H7trzMfI",
+    "formats": [
+        {
+            "format_id": "",
+            "format_note": "2160p",
+            "height": 1920,
+            "width": 3840,
+            "ext": "webm",
+            "vcodec": "vp9",
+            "acodec": "none","dynamic_range": "SDR",
+            "container": "webm_dash",
+            "protocol": "https",
+            "video_ext": "webm",
+            "audio_ext": "none",
+            "resolution": "3840x1920",
+            "aspect_ratio": 2.0,
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-us,en;q=0.5",
+                "Sec-Fetch-Mode": "navigate"
+            },
+            "format": "313 - 3840x1920 (2160p)",
+            "url": ""
+        }
+    ],
+    "best_formats": [
+        {
+            "format_id": "",
+            "format_note": "2160p",
+            "height": 1920,
+            "width": 3840,
+            "ext": "webm",
+            "vcodec": "vp9",
+            "acodec": "none","dynamic_range": "SDR",
+            "container": "webm_dash",
+            "protocol": "https",
+            "video_ext": "webm",
+            "audio_ext": "none",
+            "resolution": "3840x1920",
+            "aspect_ratio": 2.0,
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-us,en;q=0.5",
+                "Sec-Fetch-Mode": "navigate"
+            },
+            "format": "313 - 3840x1920 (2160p)",
+            "url": ""
+        }
+    ]
+}

@@ -101,181 +101,155 @@ class VideoDownloader:
             info = ydl.extract_info(url_str, download=False)
             return info
 
+    def _map_format_to_interface(self, fmt: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        根据 interfaceKey.json 的定义映射单个格式对象的字段
+        """
+        return {
+            "format_id": str(fmt.get('format_id', '')),
+            "format_note": fmt.get('format_note', ''),
+            "height": fmt.get('height'),
+            "width": fmt.get('width'),
+            "ext": fmt.get('ext', ''),
+            "vcodec": fmt.get('vcodec', ''),
+            "acodec": fmt.get('acodec', ''),
+            "dynamic_range": fmt.get('dynamic_range', ''),
+            "container": fmt.get('container', ''),
+            "protocol": fmt.get('protocol', ''),
+            "video_ext": fmt.get('video_ext', 'none'),
+            "audio_ext": fmt.get('audio_ext', 'none'),
+            "resolution": fmt.get('resolution', ''),
+            "aspect_ratio": fmt.get('aspect_ratio'),
+            "http_headers": fmt.get('http_headers', {}),
+            "format": fmt.get('format', ''),
+            "url": fmt.get('url', '')
+        }
+
+    def _map_to_interface_format(self, info: Dict[str, Any], formats: List[Dict[str, Any]], best_formats: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        根据 interfaceKey.json 的定义映射顶层响应字段
+        """
+        # 确定 media_type
+        # 如果有视频流则是 video，否则是 audio
+        has_video = any(f.get('vcodec') != 'none' and f.get('vcodec') is not None for f in formats)
+        media_type = "video" if has_video else "audio"
+
+        return {
+            "id": info.get('id', ''),
+            "title": info.get('title', ''),
+            "thumbnail": info.get('thumbnail', ''),
+            "channel_id": info.get('channel_id', ''),
+            "channel_url": info.get('channel_url', ''),
+            "duration": info.get('duration'),
+            "webpage_url": info.get('webpage_url', ''),
+            "media_type": media_type,
+            "needs_merge": any(f.get('needs_merge') for f in formats if f.get('vcodec') != 'none'),
+            "original_url": info.get('original_url', info.get('webpage_url', '')),
+            "formats": [self._map_format_to_interface(f) for f in formats],
+            "best_formats": [self._map_format_to_interface(f) for f in best_formats]
+        }
+
     def get_raw_info(self, url, enable_remote: Optional[bool] = None) -> Dict[str, Any]:
         """
         获取视频的原始信息（相当于 yt-dlp --dump-json）
-        并过滤 formats 数组，只保留视频和音频对象
-        :param url: 视频URL（字符串或HttpUrl对象）
-        :param enable_remote: 是否启用远程组件
-        :return: 原始视频信息字典
+        并过滤 formats 数组：只保留所有视频轨道 + 一个最佳音频轨道
+        同时按照 interfaceKey.json 定义的格式返回
         """
         info = self._extract_video_info(url, enable_remote=enable_remote)
 
-        # 过滤 formats 数组，只保留视频或音频
-        # 在 yt-dlp 中，如果是音视频对象，通常 vcodec 或 acodec 不为 'none'
         if 'formats' in info:
-            filtered_formats = []
+            video_formats = []
+            audio_formats = []
+
+            # 1. 分类视频和音频并添加 needs_merge 标记
             for fmt in info['formats']:
                 vcodec = fmt.get('vcodec')
                 acodec = fmt.get('acodec')
-                # 只要 vcodec 或 acodec 任意一个不是 'none'，说明是视频、音频或两者都有
-                if (vcodec and vcodec != 'none') or (acodec and acodec != 'none'):
-                    filtered_formats.append(fmt)
-            info['formats'] = filtered_formats
+
+                is_video = vcodec and vcodec != 'none'
+                is_audio = acodec and acodec != 'none'
+
+                if is_video:
+                    fmt['needs_merge'] = not is_audio
+                    video_formats.append(fmt)
+                elif is_audio:
+                    audio_formats.append(fmt)
+
+            # 2. 筛选最佳音频 (优先考虑 m4a 且码率最高)
+            best_audio = None
+            if audio_formats:
+                audio_formats.sort(key=lambda x: (1 if x.get('ext') == 'm4a' else 0, x.get('abr') or 0), reverse=True)
+                best_audio = audio_formats[0]
+
+            # 3. 找出最佳视频
+            best_video = None
+            if video_formats:
+                video_formats.sort(key=lambda x: (x.get('height') or 0, x.get('tbr') or 0), reverse=True)
+                best_video = video_formats[0]
+
+            # 4. 重新构建 formats 列表：所有视频 + 1个最佳音频
+            final_formats = video_formats
+            if best_audio:
+                final_formats.append(best_audio)
+
+            # 5. 构建 best_formats 列表
+            best_formats_list = []
+            if best_video:
+                best_formats_list.append(best_video)
+                if best_video.get('needs_merge') and best_audio:
+                    best_formats_list.append(best_audio)
+
+            # 6. 映射到 interfaceKey.json 格式
+            return self._map_to_interface_format(info, final_formats, best_formats_list)
 
         return info
-
-    def _format_info_to_response(self, format_info: Dict[str, Any]) -> FormatInfo:
-        """
-        将yt-dlp格式信息转换为响应模型
-        :param format_info: yt-dlp格式信息
-        :return: FormatInfo响应模型
-        """
-        # 解析分辨率
-        width = format_info.get('width', 0)
-        height = format_info.get('height', 0)
-        resolution = f"{width}x{height}" if width and height else "N/A"
-
-        return FormatInfo(
-            format_id=str(format_info.get('format_id', 'N/A')),
-            format_note=format_info.get('format_note', 'N/A'),
-            ext=format_info.get('ext', 'N/A'),
-            resolution=resolution,
-            fps=format_info.get('fps'),
-            filesize=format_info.get('filesize'),
-            filesize_approx=format_info.get('filesize_approx'),
-            url=format_info.get('url')
-        )
-
-    def get_video_formats(self, url, max_quality: Optional[int] = None, enable_remote: Optional[bool] = None) -> VideoInfoResponse:
-        """
-        获取视频的可用格式列表
-        :param url: 视频URL（字符串或HttpUrl对象）
-        :param max_quality: 最大分辨率高度，如1080
-        :param enable_remote: 是否启用远程组件
-        :return: VideoInfoResponse响应模型
-        """
-        # 提取视频信息
-        info = self._extract_video_info(url, enable_remote=enable_remote)
-
-        # 处理格式列表
-        formats = []
-        best_format = None
-        best_height = 0
-
-        for fmt in info.get('formats', []):
-            # 跳过纯音频格式（vcodec为none）
-            if fmt.get('vcodec') == 'none':
-                continue
-
-            # 过滤分辨率
-            height = fmt.get('height', 0)
-            if max_quality and height > max_quality:
-                continue
-
-            # 转换为响应格式
-            format_response = self._format_info_to_response(fmt)
-            formats.append(format_response)
-
-            # 找到最佳格式
-            if height > best_height:
-                best_height = height
-                best_format = format_response
-
-        # 如果没有找到最佳格式，尝试使用第一个格式
-        if not best_format and formats:
-            best_format = formats[0]
-
-        # 构建响应
-        return VideoInfoResponse(
-            title=info.get('title', 'N/A'),
-            formats=formats,
-            best_format=best_format,
-            thumbnail=info.get('thumbnail'),
-            description=info.get('description'),
-            webpage_url=info.get('webpage_url', str(url)),
-            duration=info.get('duration'),
-            uploader=info.get('uploader')
-        )
 
     def get_download_links(self, url, format_id: Optional[str] = None, max_quality: Optional[int] = None, enable_remote: Optional[bool] = None) -> Dict[str, Any]:
         """
         获取视频的最佳下载链接
-        :param url: 视频URL（字符串或HttpUrl对象）
-        :param format_id: 特定格式ID，可选
-        :param max_quality: 最大分辨率高度，可选
-        :param enable_remote: 是否启用远程组件
-        :return: 包含精简视频信息和选定格式（完整字段）的字典
+        按照 interfaceKey.json 定义的格式返回
         """
-        # 提取完整视频信息
         info = self._extract_video_info(url, enable_remote=enable_remote)
-
-        # 获取可用格式（这里我们用原始的，不进行初步过滤，以便筛选）
         available_formats = info.get('formats', [])
 
-        # 选择要返回的格式对象
         selected_formats = []
+        best_audio = None
+
+        # 预先找到最佳音频
+        audio_only = [f for f in available_formats if f.get('acodec') != 'none' and f.get('vcodec') == 'none']
+        if audio_only:
+            audio_only.sort(key=lambda x: (1 if x.get('ext') == 'm4a' else 0, x.get('abr') or 0), reverse=True)
+            best_audio = audio_only[0]
 
         if format_id:
-            # 按格式ID选择
             for fmt in available_formats:
                 if str(fmt.get('format_id')) == format_id:
+                    # 标记 needs_merge
+                    fmt['needs_merge'] = (fmt.get('vcodec') != 'none' and fmt.get('acodec') == 'none')
                     selected_formats.append(fmt)
+                    # 如果选中的是纯视频且需要合并，则自动加上最佳音频
+                    if fmt['needs_merge'] and best_audio:
+                        selected_formats.append(best_audio)
                     break
         else:
-            # 自动筛选逻辑
-            # 1. 查找最佳视频格式
+            # 自动筛选最佳
             best_video = None
-            best_height = 0
-            for fmt in available_formats:
-                if fmt.get('vcodec') != 'none':
-                    height = fmt.get('height') or 0
-                    if max_quality and height > max_quality:
-                        continue
-                    if height >= best_height:
-                        best_height = height
-                        best_video = fmt
+            video_only = [f for f in available_formats if f.get('vcodec') != 'none']
+            if video_only:
+                if max_quality:
+                    video_only = [f for f in video_only if (f.get('height') or 0) <= max_quality]
+                if video_only:
+                    video_only.sort(key=lambda x: (x.get('height') or 0, x.get('tbr') or 0), reverse=True)
+                    best_video = video_only[0]
 
-            # 2. 查找最佳音频格式
-            best_audio = None
-            best_abr = 0
-            for fmt in available_formats:
-                if fmt.get('acodec') != 'none' and fmt.get('vcodec') == 'none':
-                    abr = fmt.get('abr') or 0
-                    if abr >= best_abr:
-                        best_abr = abr
-                        best_audio = fmt
-
-            # 3. 如果没找到分离的，找最佳综合格式
-            if not best_video:
-                best_combined = None
-                best_combined_height = 0
-                for fmt in available_formats:
-                    if fmt.get('vcodec') != 'none' and fmt.get('acodec') != 'none':
-                        height = fmt.get('height') or 0
-                        if max_quality and height > max_quality:
-                            continue
-                        if height >= best_combined_height:
-                            best_combined_height = height
-                            best_combined = fmt
-                if best_combined:
-                    selected_formats.append(best_combined)
-            else:
+            if best_video:
+                best_video['needs_merge'] = (best_video.get('acodec') == 'none' or not best_video.get('acodec'))
                 selected_formats.append(best_video)
-                if best_audio:
+                if best_video['needs_merge'] and best_audio:
                     selected_formats.append(best_audio)
 
-        # 构建最终返回对象
-        # 只保留基本的视频元数据，避免返回几百行
-        return {
-            "title": info.get('title'),
-            "id": info.get('id'),
-            "duration": info.get('duration'),
-            "uploader": info.get('uploader'),
-            "thumbnail": info.get('thumbnail'),
-            "webpage_url": info.get('webpage_url'),
-            "selected_formats": selected_formats  # 这里包含选定格式的全部原始字段
-        }
+        # 返回统一的 interface 格式，其中 formats 数组只包含选中的链接
+        return self._map_to_interface_format(info, selected_formats, selected_formats)
 
     def get_best_download_link(self, url, max_quality: Optional[int] = None) -> Dict[str, Any]:
         """
