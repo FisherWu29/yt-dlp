@@ -16,8 +16,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import HttpUrl
 from typing import Dict, List, Optional
-from yt_dlp_wrapper import VideoDownloader
-from models import VideoUrlRequest, FormatInfo, VideoInfoResponse, DownloadLinkResponse
+try:
+    from yt_dlp_wrapper import VideoDownloader
+    from models import VideoUrlRequest, FormatInfo, VideoInfoResponse, DownloadLinkResponse
+except ImportError:
+    from .yt_dlp_wrapper import VideoDownloader
+    from .models import VideoUrlRequest, FormatInfo, VideoInfoResponse, DownloadLinkResponse
 
 # 配置日志
 logging.basicConfig(
