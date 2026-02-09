@@ -1,0 +1,16 @@
+name: Keep Alive Render
+
+on:
+  schedule:
+    # 每 14 分钟运行一次 (Render 免费版 15 分钟不活动会沉睡)
+    - cron: '*/14 * * * *'
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Service
+        run: |
+          # 请将下面的 URL 替换为您在 Render 上的实际服务地址
+          curl -s https://yt-dlp-n1r1.onrender.com/health || echo "Ping failed"
