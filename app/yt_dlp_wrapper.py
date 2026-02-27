@@ -9,9 +9,6 @@ import logging
 import sys
 import os
 
-# 添加项目根目录到Python路径，以便正确导入yt_dlp
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from yt_dlp import YoutubeDL
 from typing import Dict, List, Optional, Any
 from models import VideoInfoResponse, FormatInfo
